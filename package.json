@@ -6,7 +6,8 @@
   "author": "Sebastian Altamirano <ridnois@protonmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon"
+    "dev": "nodemon",
+    "start": "ts-node ./src/server.ts"
   },
   "devDependencies": {
     "@types/express": "^4.17.17",
