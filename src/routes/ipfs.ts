@@ -23,7 +23,7 @@ router.get('/images', async (_, res) => {
   }
 })
 
-// Get image from cid
+// Get from cid
 router.get('/:cid', withIPFS, async (req, res) => {
   try {
     const result = res.ipfsClient?.cat(req.params.cid)
