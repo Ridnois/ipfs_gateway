@@ -1,8 +1,11 @@
+import path from 'path'
+import fs from 'fs'
 import { Router } from 'express'
 import withIPFS from '../middleware/ipfs'
 import IPFSModel from '../models/ipfs'
 import { IPFSHTTPClient } from 'ipfs-http-client/types/src/types'
 import upload from '../middleware/multer'
+import { TIME_TO_LIVE } from '../constants/cache'
 
 declare global {
   namespace Express {
@@ -26,7 +29,19 @@ router.get('/images', async (_, res) => {
 // Get from cid
 router.get('/:cid', withIPFS, async (req, res) => {
   try {
+    const cachePath = path.join(__dirname, '..', 'cache', req.params.cid)
+
+    if (fs.existsSync(cachePath)) {
+      const stream = fs.createReadStream(cachePath)
+
+      res.setHeader('Content-Type', 'image/jpeg')
+      res.setHeader('Content-Disposition', `attachment: filename=${req.params.cid}`)
+      stream.pipe(res)
+      return
+    }
+
     const result = res.ipfsClient?.cat(req.params.cid)
+
     const chunks: Uint8Array[] = []
     for await (const chunk of result as any) {
       chunks.push(chunk)
@@ -34,9 +49,28 @@ router.get('/:cid', withIPFS, async (req, res) => {
 
     const data = Buffer.concat(chunks)
 
+    fs.writeFile(cachePath, data, (err) => {
+      if (err) {
+        console.log('Error caching file')
+        console.log(err)
+      } else {
+        console.log('File cached successfully')
+      }
+    })
+
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Content-Disposition', `attachment: filename=${req.params.cid}`)
     res.send(data)
+
+    setTimeout(() => {
+      fs.unlink(cachePath, (err) => {
+        if (err) {
+          console.log('Error deleting cache file')
+        } else {
+          console.log('Cache deleted successfully')
+        }
+      })
+    }, parseInt(TIME_TO_LIVE as string))
   } catch (e: any) {
     res.status(500).json({ error: e.error })
   }

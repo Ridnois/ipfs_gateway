@@ -1,2 +1,5 @@
-// 24 hours
-export const TIME_TO_LIVE = 1000 * 60 * 60 * 24
+import { config } from 'dotenv'
+
+config()
+
+export const TIME_TO_LIVE = process.env.CACHE_TIME
