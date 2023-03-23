@@ -16,6 +16,7 @@ declare global {
 }
 
 const router = Router()
+
 // Get all
 router.get('/images', async (_, res) => {
   try {

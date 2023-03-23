@@ -19,7 +19,6 @@ router.get('/', async (_, res) => {
 router.post('/', withIPFS, async (req, res) => {
   try {
     const { data } = req.body
-    console.log(data)
     const client = res.ipfsClient
     const { cid } = await client?.add(JSON.stringify(data)) as any
     if (cid) {
@@ -68,6 +67,42 @@ router.get('/:cid/:file', withIPFS, async (req, res) => {
   }
 })
 
+// Get one from cid
+router.get('/:cid', withIPFS, async (req, res) => {
+  try {
+    const { cid } = req.params
+    // Check if it exists on database
+    const fromDB = await Metadata.findById(cid)
+
+    // If not, get it from IPFS and store it on database
+    if (!fromDB) {
+
+      const result = res.ipfsClient?.cat(cid)
+
+      const chunks: Uint8Array[] = []
+
+      for await (const chunk of result as any) {
+        chunks.push(chunk)
+      }
+
+      const data = Buffer.concat(chunks)
+
+      const newData = new Metadata({ _id: cid, metadata: JSON.parse(data.toString()) })
+
+      await newData.save()
+
+      res.json(newData)
+      return
+    }
+
+    const metadata = await Metadata.findById(cid)
+
+    res.json(metadata?.metadata)
+  } catch (e: any) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Delete one
 router.delete('/:cid/:file', async (req, res) => {
   try {
@@ -75,6 +110,19 @@ router.delete('/:cid/:file', async (req, res) => {
     const path = `${cid}${file ? `/${file}` : ''}`
 
     const result = await Metadata.deleteOne({ _id: path })
+
+    res.send(result)
+  } catch (e: any) {
+    res.json({ error: e.message })
+  }
+})
+
+// Delete using CID
+router.delete('/:cid', async (req, res) => {
+  try {
+    const { cid } = req.params
+
+    const result = await Metadata.deleteOne({ _id: cid })
 
     res.send(result)
   } catch (e: any) {
