@@ -25,10 +25,6 @@ const IPFSSchema = new Schema({
     type: 'string',
     required: true,
   },
-  path: {
-    type: 'string',
-    required: 'false'
-  }
 })
 
 const IPFSModel: Model<IIPFSFile> = mongoose.model<IIPFSFile>('IPFSFile', IPFSSchema)

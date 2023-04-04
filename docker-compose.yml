@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  ipfs_service:
+    build:
+      context: .
+    depends_on:
+      - mongo_database
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env
+    depends_on:
+      - mongo_database
+    command: yarn dev
+  mongo_database:
+    image: "mongo"
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=ridnois
+      - MONGODB_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
+  cache:
+    
+networks:
+  decomposer:
+    driver: bridge

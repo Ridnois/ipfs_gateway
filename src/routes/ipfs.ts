@@ -6,6 +6,7 @@ import IPFSModel from '../models/ipfs'
 import { IPFSHTTPClient } from 'ipfs-http-client/types/src/types'
 import upload from '../middleware/multer'
 import { TIME_TO_LIVE } from '../constants/cache'
+import sharp from 'sharp'
 
 declare global {
   namespace Express {
@@ -30,7 +31,7 @@ router.get('/images', async (_, res) => {
 // Get from cid
 router.get('/:cid', withIPFS, async (req, res) => {
   try {
-    const cachePath = path.join(__dirname, '..', 'cache', req.params.cid)
+    const cachePath = path.join(__dirname, '..', 'cache', `${req.params.cid}.webp`)
 
     if (fs.existsSync(cachePath)) {
       const stream = fs.createReadStream(cachePath)
@@ -50,7 +51,11 @@ router.get('/:cid', withIPFS, async (req, res) => {
 
     const data = Buffer.concat(chunks)
 
-    fs.writeFile(cachePath, data, (err) => {
+    const optimized = await sharp(data)
+      .webp()
+      .toBuffer()
+
+    fs.writeFile(cachePath, optimized, (err) => {
       if (err) {
         console.log('Error caching file')
         console.log(err)
@@ -59,9 +64,9 @@ router.get('/:cid', withIPFS, async (req, res) => {
       }
     })
 
-    res.setHeader('Content-Type', 'image/jpeg')
-    res.setHeader('Content-Disposition', `attachment: filename=${req.params.cid}`)
-    res.send(data)
+    res.setHeader('Content-Type', 'image/webp')
+    res.setHeader('Content-Disposition', `attachment: filename=${req.params.cid}.webp`)
+    res.send(optimized)
 
     setTimeout(() => {
       fs.unlink(cachePath, (err) => {
@@ -119,28 +124,44 @@ router.post('/image', upload.single('image'), withIPFS, async (req, res) => {
     }
 
     // Extract data from the file
-    const { mimetype, originalname: fileName, buffer } = file
+    const { originalname: fileName, buffer } = file
 
     // Get the cid from the addition of the buffer
     const client = res.ipfsClient
-    const { cid, path } = await client?.add({
+
+    const { cid } = await client?.add({
       path: fileName,
       content: buffer
     }) as any
+
+    console.log(cid.toString)
+    // Create webp optimized version for cache
+    const optimized = await sharp(buffer).webp().toBuffer()
+    const cachePath = path.join(__dirname, '..', 'cache', `${cid.toString()}.webp`)
+    console.log(cachePath)
 
     // Store metadata on DB
     const newIPFSFile = new IPFSModel({
       _id: cid.toString(),
       cid: cid.toString(),
-      mimetype,
+      mimetype: 'image/webp',
       fileName,
-      path
     })
 
     await newIPFSFile.save()
 
+    fs.writeFile(cachePath, optimized, (err) => {
+      if (err) {
+        console.log('Error caching file')
+        console.log(err)
+      } else {
+        console.log('File cached successfully')
+      }
+    })
+
     res.json(newIPFSFile)
   } catch (e: any) {
+    console.log(e)
     res.status(500).json({ error: e.message })
   }
 })
